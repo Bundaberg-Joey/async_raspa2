@@ -44,26 +44,35 @@ def parse_output(cif_dir):
     return components
 
 
-def run_simulation(cif_name):
-    atoms = read(os.path.join('cifs', cif_name), format="cif")
-    cell = np.array(atoms.cell)
-    na, nb, nc = find_minimum_image(cell, CUTOFF)   # 1. get number of unit cells to use
-    cif_dir = write_sim_files(cif_name, na, nb, nc)  # 2. write files to location
-    run(["simulate", "simulation.input"], cwd=cif_dir)  # 3. run simulation
-    components = parse_output(cif_dir)  # 4. extract results
-    selectivity = np.log(1 + (4 * components['xenon'])) - np.log(1 + components['krypton']) # 5. calc selectivity
-    results = {'name': cif_name, 'selectivity': selectivity, **components}
-    return results  # 6. return selectivity along with cif name
+class CifRegistry:
+    
+    def __init__(self, cif_list_path):        
+        with open(str(cif_list_path), 'r') as f:
+            self.cifs = [i.strip() for i in f.readlines()][:1]
+            
+    def run_simulation(self, idx):
+        cif_name = self.cifs[idx]
+        atoms = read(os.path.join('cifs', cif_name), format="cif")
+        cell = np.array(atoms.cell)
+        na, nb, nc = find_minimum_image(cell, CUTOFF)   # 1. get number of unit cells to use
+        cif_dir = write_sim_files(cif_name, na, nb, nc)  # 2. write files to location
+        run(["simulate", "simulation.input"], cwd=cif_dir)  # 3. run simulation
+        components = parse_output(cif_dir)  # 4. extract results
+        selectivity = np.log(1 + (4 * components['xenon'])) - np.log(1 + components['krypton']) # 5. calc selectivity
+        results = {'index': idx, 'name': cif_name, 'selectivity': selectivity, **components}
+        return results  # 6. return selectivity along with cif name
+    
+    def __len__(self):
+        return len(self.cifs)
       
     
 if __name__ == '__main__':
     a = perf_counter()
     
-    with open('cif_list.txt', 'r') as f:
-        names = [i.strip() for i in f.readlines()]
-        
+    cifs = CifRegistry('cif_list.txt')
+    
     with ProcessPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(run_simulation, n) for n in names]
+        futures = [executor.submit(cifs.run_simulation, idx) for idx in range(len(cifs))]
         
     output = [a.result() for a in futures]
         
