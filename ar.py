@@ -1,7 +1,7 @@
 import os
 from glob import glob
 from subprocess import run
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
 from shutil import copytree, copy
 from time import perf_counter
 
@@ -61,16 +61,10 @@ if __name__ == '__main__':
     with open('cif_list.txt', 'r') as f:
         names = [i.strip() for i in f.readlines()]
         
-    pool = Pool(processes=4)
-    output = []
-    for n in names:
-        result = pool.apply_async(run_simulation, (n,))
-        output.append(result)
+    with ProcessPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(run_simulation, n) for n in names]
         
-    pool.close()
-    pool.join()
-    
-    output = [a.get() for a in output]
+    output = [a.result() for a in futures]
         
     print(output)
     
