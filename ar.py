@@ -27,7 +27,7 @@ def write_sim_files(cif_name, na, nb, nc):
 
 def parse_output(results_dir, cif_name_clean):
     path = os.path.join(results_dir, 'Output', 'System_0')
-    base_path = glob(F"{path}/output_{cif_name_clean}*.data")[0]
+    base_path = glob(F"{path}/output_{cif_name_clean}_*.data")[0]
 
     components = {}
     with open(base_path, 'r') as fd:
