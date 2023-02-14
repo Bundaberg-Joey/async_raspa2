@@ -43,7 +43,7 @@ def parse_output(results_dir, cif_name_clean):
     return components
 
 
-class CifRegistry:
+class RaspaRegistry:
     
     def __init__(self, cif_list_path):        
         with open(str(cif_list_path), 'r') as f:
@@ -73,10 +73,10 @@ class CifRegistry:
 if __name__ == '__main__':
     a = perf_counter()
     
-    cifs = CifRegistry('cif_list.txt')
+    raspa = RaspaRegistry('cif_list.txt')
     
     with ProcessPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(cifs.run_simulation, idx) for idx in range(len(cifs))]
+        futures = [executor.submit(raspa.run_simulation, idx) for idx in range(len(raspa))]
         
     output = [a.result() for a in futures]
         
