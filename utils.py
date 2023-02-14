@@ -1,5 +1,8 @@
 import numpy as np
 
+class RaspaOutputNotExist(FileNotFoundError):
+  pass
+
 
 def find_minimum_image(cell, cutoff):
     ncutoff = cutoff + 1e-8 * cutoff

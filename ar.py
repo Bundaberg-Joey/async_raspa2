@@ -8,7 +8,7 @@ from time import perf_counter
 import numpy as np
 from ase.io import read
 
-from utils import xe_kr_input, find_minimum_image
+from utils import xe_kr_input, find_minimum_image, RaspaOutputNotExist
 
 
 CUTOFF = 16.0
@@ -27,7 +27,10 @@ def write_sim_files(sim_dir, cif_name, na, nb, nc):
 
 def parse_output(results_dir, cif_name_clean):
     path = os.path.join(results_dir, 'Output', 'System_0')
-    base_path = glob(F"{path}/output_{cif_name_clean}_*.data")[0]
+    try:
+        base_path = glob(F"{path}/output_{cif_name_clean}_*.data")[0]
+    except IndexError:
+        raise RaspaOutputNotExist
 
     components = {}
     with open(base_path, 'r') as fd:
@@ -58,12 +61,18 @@ class RaspaRegistry:
         cif_name = self.cifs[idx]
         cif_name_clean = cif_name.replace('.cif', '')
         
-        atoms = read(os.path.join('cifs', cif_name), format="cif")
-        cell = np.array(atoms.cell)
-        na, nb, nc = find_minimum_image(cell, CUTOFF)   # 1. get number of unit cells to use
-        sim_file_name = write_sim_files(self.simulation_dir, cif_name, na, nb, nc)  # 2. write files to location
-        run(["simulate", "-i", sim_file_name], cwd=self.simulation_dir)  # 3. run simulation
-        components = parse_output(self.simulation_dir, cif_name_clean)  # 4. extract results
+        try:
+            # checks if output already exists from previous parallel run
+            components = parse_output(self.simulation_dir, cif_name_clean)
+        except RaspaOutputNotExist:
+            # only perform simulation if an output file doesnt already exist
+            atoms = read(os.path.join('cifs', cif_name), format="cif")
+            cell = np.array(atoms.cell)
+            na, nb, nc = find_minimum_image(cell, CUTOFF)   # 1. get number of unit cells to use
+            sim_file_name = write_sim_files(self.simulation_dir, cif_name, na, nb, nc)  # 2. write files to location
+            run(["simulate", "-i", sim_file_name], cwd=self.simulation_dir)  # 3. run simulation
+            components = parse_output(self.simulation_dir, cif_name_clean)  # 4. extract results
+            
         selectivity = np.log(1 + (4 * components['xenon'])) - np.log(1 + components['krypton']) # 5. calc selectivity
         results = {'index': idx, 'name': cif_name, 'selectivity': selectivity, **components}
         return results  # 6. return selectivity along with cif name
