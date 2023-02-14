@@ -52,7 +52,8 @@ def run_simulation(cif_name):
     run(["simulate", "simulation.input"], cwd=cif_dir)  # 3. run simulation
     components = parse_output(cif_dir)  # 4. extract results
     selectivity = np.log(1 + (4 * components['xenon'])) - np.log(1 + components['krypton']) # 5. calc selectivity
-    return cif_name, selectivity  # 6. return selectivity along with cif name
+    results = {'name': cif_name, 'selectivity': selectivity, **components}
+    return results  # 6. return selectivity along with cif name
       
     
 if __name__ == '__main__':
