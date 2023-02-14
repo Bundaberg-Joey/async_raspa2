@@ -18,17 +18,16 @@ def write_sim_files(cif_name, na, nb, nc):
     # writes simulation.input along with all other files needed for the raspa sim to a single dir
     # returns the name of the directoy containing all the files + cif file
     sim_details = xe_kr_input(cif_name.replace('.cif', ''), na, nb, nc)
-    dir_name = os.path.join('working_dir', cif_name.replace('.cif', ''))
-    copytree('simulation_template', dir_name)
-    copy(os.path.join('cifs', cif_name), os.path.join(dir_name, cif_name))
-    with open(os.path.join(dir_name, 'simulation.input'), 'w') as f:
+    copy(os.path.join('cifs', cif_name), os.path.join('raspa_dir', cif_name))
+    sim_file_name = F"simulation_{cif_name.replace('.cif', '')}.input"
+    with open(os.path.join('raspa_dir', sim_file_name), 'w') as f:
         f.writelines(sim_details)
-    return dir_name
+    return sim_file_name
 
 
-def parse_output(cif_dir):
-    path = os.path.join(cif_dir, 'Output', 'System_0')
-    base_path = glob(F"{path}/*.data")[0]
+def parse_output(results_dir, cif_name_clean):
+    path = os.path.join(results_dir, 'Output', 'System_0')
+    base_path = glob(F"{path}/output_{cif_name_clean}*.data")[0]
 
     components = {}
     with open(base_path, 'r') as fd:
@@ -48,16 +47,21 @@ class CifRegistry:
     
     def __init__(self, cif_list_path):        
         with open(str(cif_list_path), 'r') as f:
-            self.cifs = [i.strip() for i in f.readlines()][:1]
+            self.cifs = [i.strip() for i in f.readlines()]
+            
+        if not os.path.exists('raspa_dir'):
+            copytree('simulation_template', 'raspa_dir')
             
     def run_simulation(self, idx):
         cif_name = self.cifs[idx]
+        cif_name_clean = cif_name.replace('.cif', '')
+        
         atoms = read(os.path.join('cifs', cif_name), format="cif")
         cell = np.array(atoms.cell)
         na, nb, nc = find_minimum_image(cell, CUTOFF)   # 1. get number of unit cells to use
-        cif_dir = write_sim_files(cif_name, na, nb, nc)  # 2. write files to location
-        run(["simulate", "simulation.input"], cwd=cif_dir)  # 3. run simulation
-        components = parse_output(cif_dir)  # 4. extract results
+        sim_file_name = write_sim_files(cif_name, na, nb, nc)  # 2. write files to location
+        run(["simulate", "-i", sim_file_name], cwd='raspa_dir')  # 3. run simulation
+        components = parse_output('raspa_dir', cif_name_clean)  # 4. extract results
         selectivity = np.log(1 + (4 * components['xenon'])) - np.log(1 + components['krypton']) # 5. calc selectivity
         results = {'index': idx, 'name': cif_name, 'selectivity': selectivity, **components}
         return results  # 6. return selectivity along with cif name
@@ -76,7 +80,8 @@ if __name__ == '__main__':
         
     output = [a.result() for a in futures]
         
-    print(output)
+    for o in output:
+        print(o)
     
     b = perf_counter()
     print(b-a)
